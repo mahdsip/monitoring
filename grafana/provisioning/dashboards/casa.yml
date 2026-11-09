@@ -1,0 +1,13 @@
+# Dashboards provisioned from grafana/dashboards (mounted read-only
+# at /var/lib/grafana-dashboards). The repo is the source of truth: edits in
+# the UI are not saved back; regenerate the JSON instead.
+apiVersion: 1
+providers:
+  - name: casa
+    folder: Casa
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana-dashboards

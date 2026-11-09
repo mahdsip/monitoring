@@ -1,0 +1,15 @@
+# Grafana datasource provisioned from the repo (read-only in the UI).
+# Grafana and Prometheus share the internal Docker network `monitoring`,
+# so the datasource uses the container name, not a LAN IP.
+# The UI-created "prometheus" datasource is left untouched for the old dashboards.
+apiVersion: 1
+datasources:
+  - name: Prometheus (casa)
+    uid: prom-casa
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: false
+    editable: false
+    jsonData:
+      timeInterval: 5s

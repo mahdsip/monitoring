@@ -1,0 +1,23 @@
+{
+  "textfile_dir": "/var/lib/node_exporter/textfile_collector",
+  "projects": [
+    {
+      "dir": "/home/pi/photoprism",
+      "file": "docker-compose.yml",
+      "services": {
+        "mariadb": {
+          "health_timeout": 300,
+          "backup": {"type": "mariadb-dump", "dir": "/home/pi/photoprism/backups-mariadb", "keep": 4},
+          "health": [
+            {"exec": ["sh", "-c", "MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" exec mariadb -uroot -e 'SELECT 1'"]},
+            {"http": "http://127.0.0.1:2342/api/v1/status"}
+          ]
+        },
+        "photoprism": {
+          "health_timeout": 300,
+          "health": [{"http": "http://127.0.0.1:2342/api/v1/status"}]
+        }
+      }
+    }
+  ]
+}

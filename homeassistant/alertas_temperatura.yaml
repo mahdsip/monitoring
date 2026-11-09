@@ -1,0 +1,49 @@
+# Home Assistant automation: Prometheus/Alertmanager temperature alerts ->
+# HA companion app notifications on two phones only.
+#
+# Install: Settings -> Automations -> Create -> (3 dots) Edit in YAML -> paste.
+# Replace CAMBIAR-POR-UN-ID-ALEATORIO with a random id (openssl rand -hex 16)
+# and write the same id on pimonitor (alertmanager/secrets/ha_webhook_url).
+# Tested syntax: Home Assistant 2026.10.
+#
+# Alertmanager posts {status, alerts: [{status, labels, annotations, ...}]}.
+# Each alert -> one notification per phone. The `tag` makes the "resolved"
+# notification replace the original one instead of piling up.
+alias: Alertas de temperatura (Prometheus)
+description: Avisos de Alertmanager (pimonitor) a la app de Home Assistant de dos teléfonos.
+mode: queued
+max: 20
+triggers:
+  - trigger: webhook
+    webhook_id: "CAMBIAR-POR-UN-ID-ALEATORIO"
+    allowed_methods: [POST]
+    local_only: true
+actions:
+  - repeat:
+      for_each: "{{ trigger.json.alerts | default([]) }}"
+      sequence:
+        - variables:
+            device: "{{ repeat.item.labels.instance | regex_replace(':[0-9]+$', '') }}"
+            critical: "{{ repeat.item.labels.severity == 'critical' }}"
+            resolved: "{{ repeat.item.status == 'resolved' }}"
+            # Single-line templates: multi-line block scalars break when pasted
+            # into the HA YAML editor (indentation is lost).
+            title: "{% if resolved %}Temperatura normal: {{ device }}{% elif critical %}Temperatura crítica: {{ device }}{% else %}Temperatura alta: {{ device }}{% endif %}"
+            message: "{% if resolved %}{{ device }} ha vuelto a una temperatura normal.{% else %}{{ repeat.item.annotations.summary }}{% endif %}"
+            payload:
+              title: "{{ title }}"
+              message: "{{ message }}"
+              data:
+                tag: "temperatura-{{ device }}"
+                # Android
+                channel: Alertas de temperatura
+                importance: "{{ 'high' if critical and not resolved else 'default' }}"
+                # iOS
+                push:
+                  interruption-level: "{{ 'time-sensitive' if critical and not resolved else 'active' }}"
+        # Only these phones (not notify.notify, which would reach every device).
+        # Replace with your companion-app services (Developer tools -> Actions -> "notify.mobile_app_").
+        - action: notify.mobile_app_telefono_1
+          data: "{{ payload }}"
+        - action: notify.mobile_app_telefono_2
+          data: "{{ payload }}"

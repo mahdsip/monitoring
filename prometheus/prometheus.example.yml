@@ -1,0 +1,70 @@
+# Prometheus config for the home stack. Copy to prometheus.yml (gitignored)
+# and replace the example IPs and names with yours.
+#   cp prometheus/prometheus.example.yml prometheus/prometheus.yml
+# Validate: docker exec prometheus promtool check config /etc/prometheus/prometheus.yml
+# Apply:    docker kill -s HUP prometheus   (or restart the container)
+global:
+  scrape_interval: 15s
+  external_labels:
+    monitor: casa
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']   # internal Docker network, no published port
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+    relabel_configs:
+      - target_label: instance
+        replacement: 'pimonitor:9090'
+
+  # node_exporter on every host. `instance` is the short device name used by the
+  # Grafana dashboard and the alerts (it must match `name` in casa.devices.yml).
+  - job_name: node-exporter
+    static_configs:
+      - targets: ['192.168.1.30:9100']
+        labels: {instance: 'pimonitor:9100'}
+      - targets: ['192.168.1.10:9100']
+        labels: {instance: 'pihole:9100'}
+      - targets: ['192.168.1.20:9100']
+        labels: {instance: 'homeassistant:9100'}
+      - targets: ['192.168.1.40:9100']
+        labels: {instance: 'nas:9100'}
+
+  # Home Assistant Prometheus integration (here only its update entities).
+  # The long-lived token lives in secrets/ha_token (mode 600, owned by the
+  # container user `nobody`), never in this file.
+  - job_name: homeassistant
+    scrape_interval: 60s
+    metrics_path: /api/prometheus
+    authorization:
+      credentials_file: /etc/prometheus/secrets/ha_token
+    static_configs:
+      - targets: ['192.168.1.20:8123']
+    relabel_configs:
+      - target_label: instance
+        replacement: 'homeassistant:8123'
+
+  # Service probes through blackbox_exporter. Targets and labels are generated
+  # by grafana/build_dashboard.py into prometheus/servicios/servicios.yml.
+  - job_name: servicios
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    metrics_path: /probe
+    file_sd_configs:
+      - files: ['/etc/prometheus/servicios/*.yml']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [module]
+        target_label: __param_module
+      - source_labels: [device]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115

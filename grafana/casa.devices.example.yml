@@ -1,0 +1,66 @@
+# Template for casa.devices.yml (the real file is gitignored because it holds
+# public hostnames). Copy, edit, then generate the dashboard + probe targets:
+#   cp casa.devices.example.yml casa.devices.yml
+#   uv run --no-project --with pyyaml==6.0.3 python grafana/build_dashboard.py
+#
+# id        = Prometheus instance name without the port (node_exporter target).
+# parent    = router or another device id (e.g. a reverse proxy).
+# side      = left | right | center: column for devices hanging from the router
+#             (devices with a non-router parent go in a row below it).
+# link      = ethernet (default) | wifi (dashed line).
+# os_check  = show "OS without support" from node_os_version (Debian family).
+# docker    = the host runs containers checked by familia-host-metrics.
+# apps      = label for app updates published as familia_app_update_available.
+# hw        = hardware shown next to the name (rpi2, rpi3, rpi4, rpi5, ...); the
+#             RAM next to it comes from Prometheus.
+# os_name   = fixed OS name instead of node_os_info (e.g. Home Assistant OS,
+#             whose node_exporter add-on reports its container's OS).
+# root_disk = false to hide "/" usage (e.g. Home Assistant OS has no "/" mount).
+# disks     = extra filesystems to show besides "/" (e.g. external USB disks):
+#             [{name: Disco externo, mountpoint: /media/disco}]
+# services  = live probes (blackbox_exporter modules in blackbox):
+#             http_up, http_auth, https_lan, https_public, tcp_open, dns_resolve.
+router: {name: Router, ip: 192.168.1.1}
+details_dashboard: {uid: rYdddlPWj, slug: node-exporter-full, job: node-exporter}
+
+devices:
+  - id: proxy
+    hw: rpi2
+    ip: 192.168.1.10
+    role: DNS · proxy inverso
+    parent: router
+    side: center
+    os_check: true
+    services:
+      - {name: DNS, module: dns_resolve, target: "192.168.1.10:53"}
+      - {name: Proxy inverso, module: tcp_open, target: "192.168.1.10:443"}
+
+  - id: homeassistant
+    hw: rpi4
+    os_name: Home Assistant OS
+    ip: 192.168.1.20
+    role: Domótica
+    parent: proxy
+    services:
+      - {name: Home Assistant, module: http_up, target: "http://192.168.1.20:8123/manifest.json"}
+      - {name: Acceso público, module: https_public, target: "https://ha.example.org/"}
+
+  - id: monitor
+    hw: rpi4
+    ip: 192.168.1.30
+    role: Monitorización
+    parent: router
+    side: left
+    docker: true
+    disks:
+      - {name: Disco externo, mountpoint: /media/disco}
+    services:
+      - {name: Grafana, module: http_up, target: "http://192.168.1.30:3000/api/health"}
+
+  - id: desktop
+    ip: 192.168.1.40
+    role: Escritorio
+    parent: router
+    side: right
+    link: wifi
+    services: []

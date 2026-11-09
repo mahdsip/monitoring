@@ -1,0 +1,24 @@
+# Alertmanager for the home Prometheus (pimonitor).
+# Runs on the internal Docker network `monitoring`; publishes no port.
+# The Home Assistant webhook URL lives in a separate secret file
+# (secrets/ha_webhook_url, mode 600), never in this file.
+# Validate: amtool check-config alertmanager.yml
+route:
+  receiver: home-assistant
+  group_by: [alertname, instance]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 2h
+
+receivers:
+  - name: home-assistant
+    webhook_configs:
+      - url_file: /etc/alertmanager/secrets/ha_webhook_url
+        send_resolved: true
+        timeout: 10s
+
+inhibit_rules:
+  # A critical alert silences the warning for the same device.
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: [instance]

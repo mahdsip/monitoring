@@ -1,0 +1,24 @@
+# Temperature alerts for every node_exporter host (CPU thermal zone).
+# Loaded by Prometheus from /etc/prometheus/rules/*.yml.
+# Validate: promtool check rules temperatura.yml
+groups:
+  - name: temperatura
+    rules:
+      - alert: TemperaturaAlta
+        expr: max by (instance) (node_thermal_zone_temp) > 80
+        for: 5m
+        # Avoid flapping when the temperature hovers around the threshold.
+        keep_firing_for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ reReplaceAll \":[0-9]+$\" \"\" $labels.instance }} está a {{ printf \"%.0f\" $value }} °C (umbral 80 °C)"
+
+      - alert: TemperaturaCritica
+        expr: max by (instance) (node_thermal_zone_temp) > 85
+        for: 2m
+        keep_firing_for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ reReplaceAll \":[0-9]+$\" \"\" $labels.instance }} está a {{ printf \"%.0f\" $value }} °C (umbral 85 °C, la CPU reduce velocidad)"
